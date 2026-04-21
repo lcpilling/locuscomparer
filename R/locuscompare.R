@@ -1,15 +1,23 @@
 #' Read association summary statistics and append normalized columns.
-#' The input must contain chromosome, position, and -log10(p-value).
+#' The input must contain chromosome, position, and either a -log10(p-value)
+#' column or a raw p-value column. If a raw p-value column is supplied (via
+#' \code{pval_col}), it is converted to -log10(p-value) automatically.
 #'
-#' @param in_fn (string) Path to the input file.
+#' @param in_fn (string or data.frame) Path to the input file, or a data.frame.
 #' @param chromosome_col (string, optional) Name of the chromosome column. Default: 'chromosome'.
 #' @param position_col (string, optional) Name of the position column. Default: 'position'.
-#' @param logp_col (string, optional) Name of the -log10(p-value) column. Default: '-log10 p-value'.
+#' @param logp_col (string, optional) Name of the -log10(p-value) column.
+#'   Default: '-log10 p-value'. If this column is absent but \code{pval_col}
+#'   is present, the p-value is converted automatically.
+#' @param pval_col (string, optional) Name of a raw p-value column to use as a
+#'   fallback when \code{logp_col} is not found. Default: 'pval'.
 #' @examples
-#' in_fn = system.file('extdata', 'gwas.tsv', package = 'locuscomparer')
-#' d1 = read_metal(in_fn, chromosome_col = 'chromosome', position_col = 'position', logp_col = '-log10 p-value')
+#' # Using a data.frame with a raw p-value column:
+#' df = data.frame(chromosome = '1', position = 1:10, pval = 10^-(1:10))
+#' d1 = read_metal(df, chromosome_col = 'chromosome', position_col = 'position', pval_col = 'pval')
 #' @export
-read_metal=function(in_fn, chromosome_col='chromosome', position_col='position', logp_col='-log10 p-value'){
+read_metal=function(in_fn, chromosome_col='chromosome', position_col='position',
+                    logp_col='-log10 p-value', pval_col='pval'){
     # message('Reading ', in_fn)
 
     if (is.character(in_fn)){
@@ -26,16 +34,28 @@ read_metal=function(in_fn, chromosome_col='chromosome', position_col='position',
 
     }
 
-    required_cols = c(chromosome_col, position_col, logp_col)
-    missing_cols = setdiff(required_cols, colnames(d))
-    if (length(missing_cols) > 0) {
-        stop(sprintf('Missing required columns: %s', paste(missing_cols, collapse = ', ')))
+    coord_cols = c(chromosome_col, position_col)
+    missing_coord = setdiff(coord_cols, colnames(d))
+    if (length(missing_coord) > 0) {
+        stop(sprintf('Missing required columns: %s', paste(missing_coord, collapse = ', ')))
+    }
+
+    if (logp_col %in% colnames(d)) {
+        logp_values = as.numeric(d[[logp_col]])
+    } else if (pval_col %in% colnames(d)) {
+        message(sprintf('Column "%s" not found; converting "%s" to -log10(p-value).', logp_col, pval_col))
+        logp_values = -log10(as.numeric(d[[pval_col]]))
+    } else {
+        stop(sprintf(
+            'No suitable value column found. Provide either a -log10(p-value) column ("%s") or a p-value column ("%s").',
+            logp_col, pval_col
+        ))
     }
 
     d = data.frame(
         chr = d[[chromosome_col]],
         pos = d[[position_col]],
-        logp = d[[logp_col]],
+        logp = logp_values,
         stringsAsFactors = FALSE
     )
     d$chr = as.character(d$chr)
@@ -271,10 +291,10 @@ add_label = function(merged, snp, snp_map = NULL){
 #' @export
 make_scatterplot = function (merged, title1, title2, color, shape, size, legend = TRUE, legend_position = c('bottomright','topright','topleft')) {
 
-    p = ggplot(merged, aes(logp1, logp2)) +
+    p = ggplot(merged, aes(x = logp1, y = logp2)) +
         geom_point(aes(fill = snp_id, size = snp_id, shape = snp_id), alpha = 0.8) +
         geom_point(data = merged[merged$label != "",],
-                   aes(logp1, logp2, fill = snp_id, size = snp_id, shape = snp_id)) +
+                   aes(x = logp1, y = logp2, fill = snp_id, size = snp_id, shape = snp_id)) +
         xlab(bquote(.(title1) ~ -log[10] * '(P)')) +
         ylab(bquote(.(title2) ~ -log[10] * '(P)')) +
         scale_fill_manual(values = color, guide = "none") +
@@ -334,9 +354,9 @@ make_scatterplot = function (merged, title1, title2, color, shape, size, legend 
 #' @export
 make_locuszoom=function(metal,title,chr,color,shape,size,ylab_linebreak=FALSE){
 
-    p = ggplot(metal,aes(x=pos,logp))+
+    p = ggplot(metal,aes(x=pos, y=logp))+
         geom_point(aes(fill=snp_id,size=snp_id,shape=snp_id),alpha=0.8)+
-        geom_point(data=metal[metal$label!='',],aes(x=pos,logp,fill=snp_id,size=snp_id,shape=snp_id))+
+        geom_point(data=metal[metal$label!='',],aes(x=pos, y=logp, fill=snp_id,size=snp_id,shape=snp_id))+
         scale_fill_manual(values=color,guide='none')+
         scale_shape_manual(values=shape,guide='none')+
         scale_size_manual(values=size,guide='none')+
@@ -417,15 +437,19 @@ make_combined_plot = function (merged, title1, title2, ld, chr, snp = NULL, snp_
 }
 
 #' Make a locuscompare plot.
-#' @param in_fn1 (string) Path to the input file for study 1.
-#' @param in_fn2 (string) Path to the input file for study 2.
-#' @param chromosome_col1 (string, optional) Name of the chromosome column. Default: 'chromosome'.
-#' @param position_col1 (string, optional) Name of the position column. Default: 'position'.
-#' @param logp_col1 (string, optional) Name of the -log10(p-value) column. Default: '-log10 p-value'.
+#' @param in_fn1 (string or data.frame) Path to the input file for study 1, or a data.frame.
+#' @param in_fn2 (string or data.frame) Path to the input file for study 2, or a data.frame.
+#' @param chromosome_col1 (string, optional) Name of the chromosome column in dataset 1. Default: 'chromosome'.
+#' @param position_col1 (string, optional) Name of the position column in dataset 1. Default: 'position'.
+#' @param logp_col1 (string, optional) Name of the -log10(p-value) column in dataset 1. Default: '-log10 p-value'.
+#'   If absent, \code{pval_col1} is used and converted automatically.
+#' @param pval_col1 (string, optional) Fallback raw p-value column for dataset 1. Default: 'pval'.
 #' @param title1 (string) The title for the x-axis.
-#' @param chromosome_col2 (string, optional) Name of the chromosome column. Default: 'chromosome'.
-#' @param position_col2 (string, optional) Name of the position column. Default: 'position'.
-#' @param logp_col2 (string, optional) Name of the -log10(p-value) column. Default: '-log10 p-value'.
+#' @param chromosome_col2 (string, optional) Name of the chromosome column in dataset 2. Default: 'chromosome'.
+#' @param position_col2 (string, optional) Name of the position column in dataset 2. Default: 'position'.
+#' @param logp_col2 (string, optional) Name of the -log10(p-value) column in dataset 2. Default: '-log10 p-value'.
+#'   If absent, \code{pval_col2} is used and converted automatically.
+#' @param pval_col2 (string, optional) Fallback raw p-value column for dataset 2. Default: 'pval'.
 #' @param title2 (string) The title for the y-axis.
 #' @param snp (string or data.frame, optional) Either a lead SNP identifier ("CHR:POS") or a
 #' data.frame with columns chromosome, position, and rsid for optional RSID labeling. Default: NULL.
@@ -439,20 +463,21 @@ make_combined_plot = function (merged, title1, title2, ld, chr, snp = NULL, snp_
 #' @param legend (boolean, optional) Should the legend be shown? Default: TRUE.
 #' @param legend_position (string, optional) Either 'bottomright','topright', or 'topleft'. Default: 'bottomright'.
 #' @param lz_ylab_linebreak (boolean, optional) Whether to break the line of y-axis of the locuszoom plot.
-#' @param genome (string, optional) Genome assembly, either 'hg19' or 'hg38'. Default: 'hg19'.
 #' @examples
-#' in_fn1 = system.file('extdata','gwas.tsv', package = 'locuscomparer')
-#' in_fn2 = system.file('extdata','eqtl.tsv', package = 'locuscomparer')
-#' locuscompare(in_fn1 = in_fn1, in_fn2 = in_fn2)
+#' # Using data.frames with a raw p-value column:
+#' d1 = data.frame(chromosome = '1', position = 1:100, pval = 10^-runif(100, 1, 10))
+#' d2 = data.frame(chromosome = '1', position = 1:100, pval = 10^-runif(100, 1, 10))
+#' locuscompare(in_fn1 = d1, in_fn2 = d2, min_match = 10)
 #' @export
 locuscompare = function(in_fn1, in_fn2, chromosome_col1 = "chromosome", position_col1 = "position",
-                 logp_col1 = "-log10 p-value", title1 = "eQTL", chromosome_col2 = "chromosome",
-                 position_col2 = "position", logp_col2 = "-log10 p-value", title2 = "GWAS",
+                 logp_col1 = "-log10 p-value", pval_col1 = "pval", title1 = "eQTL",
+                 chromosome_col2 = "chromosome", position_col2 = "position",
+                 logp_col2 = "-log10 p-value", pval_col2 = "pval", title2 = "GWAS",
                  snp = NULL, lead_ld = NULL, population = "EUR", min_match = 10, combine = TRUE, legend = TRUE,
                  legend_position = c('bottomright','topright','topleft'),
                  lz_ylab_linebreak = FALSE) {
-    d1 = read_metal(in_fn1, chromosome_col1, position_col1, logp_col1)
-    d2 = read_metal(in_fn2, chromosome_col2, position_col2, logp_col2)
+    d1 = read_metal(in_fn1, chromosome_col1, position_col1, logp_col1, pval_col1)
+    d2 = read_metal(in_fn2, chromosome_col2, position_col2, logp_col2, pval_col2)
 
     merged = merge(d1, d2, by = c("chr", "pos", "snp_id"), suffixes = c("1", "2"), all = FALSE)
     if (nrow(merged) < min_match) {

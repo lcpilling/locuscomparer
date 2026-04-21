@@ -13,10 +13,9 @@ Description: locuscomparer is the standalone version of the LocusCompare
 License: GPL-3
 Encoding: UTF-8
 LazyData: true
-Imports: cowplot (>= 0.6.1),
-    ggplot2 (>= 2.2.1),
-    ggrepel (>= 0.6.5),
-    stringr (>= 1.2.0),
+Imports: cowplot (>= 1.0.0),
+    ggplot2 (>= 3.3.0),
+    ggrepel (>= 0.9.0),
     DBI (>= 1.0.0),
     RMySQL (>= 0.10.17),
     rlang (>= 0.3.1)

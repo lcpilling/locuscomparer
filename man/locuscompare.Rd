@@ -6,31 +6,37 @@
 \usage{
 locuscompare(in_fn1, in_fn2, chromosome_col1 = "chromosome",
   position_col1 = "position", logp_col1 = "-log10 p-value",
-  title1 = "eQTL", chromosome_col2 = "chromosome",
+  pval_col1 = "pval", title1 = "eQTL", chromosome_col2 = "chromosome",
   position_col2 = "position", logp_col2 = "-log10 p-value",
-  title2 = "GWAS", snp = NULL, lead_ld = NULL, population = "EUR",
-  min_match = 10, combine = TRUE, legend = TRUE,
+  pval_col2 = "pval", title2 = "GWAS", snp = NULL, lead_ld = NULL,
+  population = "EUR", min_match = 10, combine = TRUE, legend = TRUE,
   legend_position = c("bottomright", "topright", "topleft"),
   lz_ylab_linebreak = FALSE)
 }
 \arguments{
-\item{in_fn1}{(string) Path to the input file for study 1.}
+\item{in_fn1}{(string or data.frame) Path to the input file for study 1, or a data.frame.}
 
-\item{in_fn2}{(string) Path to the input file for study 2.}
+\item{in_fn2}{(string or data.frame) Path to the input file for study 2, or a data.frame.}
 
-\item{chromosome_col1}{(string, optional) Name of the chromosome column. Default: 'chromosome'.}
+\item{chromosome_col1}{(string, optional) Name of the chromosome column in dataset 1. Default: 'chromosome'.}
 
-\item{position_col1}{(string, optional) Name of the position column. Default: 'position'.}
+\item{position_col1}{(string, optional) Name of the position column in dataset 1. Default: 'position'.}
 
-\item{logp_col1}{(string, optional) Name of the -log10(p-value) column. Default: '-log10 p-value'.}
+\item{logp_col1}{(string, optional) Name of the -log10(p-value) column in dataset 1. Default: '-log10 p-value'.
+  If absent, \code{pval_col1} is used and converted automatically.}
+
+\item{pval_col1}{(string, optional) Fallback raw p-value column for dataset 1. Default: 'pval'.}
 
 \item{title1}{(string) The title for the x-axis.}
 
-\item{chromosome_col2}{(string, optional) Name of the chromosome column. Default: 'chromosome'.}
+\item{chromosome_col2}{(string, optional) Name of the chromosome column in dataset 2. Default: 'chromosome'.}
 
-\item{position_col2}{(string, optional) Name of the position column. Default: 'position'.}
+\item{position_col2}{(string, optional) Name of the position column in dataset 2. Default: 'position'.}
 
-\item{logp_col2}{(string, optional) Name of the -log10(p-value) column. Default: '-log10 p-value'.}
+\item{logp_col2}{(string, optional) Name of the -log10(p-value) column in dataset 2. Default: '-log10 p-value'.
+  If absent, \code{pval_col2} is used and converted automatically.}
+
+\item{pval_col2}{(string, optional) Fallback raw p-value column for dataset 2. Default: 'pval'.}
 
 \item{title2}{(string) The title for the y-axis.}
 
@@ -58,7 +64,8 @@ three plots will be returned. Default: TRUE.}
 Make a locuscompare plot.
 }
 \examples{
-in_fn1 = system.file('extdata','gwas.tsv', package = 'locuscomparer')
-in_fn2 = system.file('extdata','eqtl.tsv', package = 'locuscomparer')
-locuscompare(in_fn1 = in_fn1, in_fn2 = in_fn2)
+# Using data.frames with a raw p-value column:
+d1 = data.frame(chromosome = '1', position = 1:100, pval = 10^-runif(100, 1, 10))
+d2 = data.frame(chromosome = '1', position = 1:100, pval = 10^-runif(100, 1, 10))
+locuscompare(in_fn1 = d1, in_fn2 = d2, min_match = 10)
 }

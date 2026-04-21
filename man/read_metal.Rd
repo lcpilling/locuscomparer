@@ -5,21 +5,30 @@
 \title{Read association summary statistics and append normalized columns.}
 \usage{
 read_metal(in_fn, chromosome_col = "chromosome", position_col = "position",
-  logp_col = "-log10 p-value")
+  logp_col = "-log10 p-value", pval_col = "pval")
 }
 \arguments{
-\item{in_fn}{(string) Path to the input file.}
+\item{in_fn}{(string or data.frame) Path to the input file, or a data.frame.}
 
 \item{chromosome_col}{(string, optional) Name of the chromosome column. Default: 'chromosome'.}
 
 \item{position_col}{(string, optional) Name of the position column. Default: 'position'.}
 
-\item{logp_col}{(string, optional) Name of the -log10(p-value) column. Default: '-log10 p-value'.}
+\item{logp_col}{(string, optional) Name of the -log10(p-value) column.
+  Default: '-log10 p-value'. If this column is absent but \code{pval_col}
+  is present, the p-value is converted automatically.}
+
+\item{pval_col}{(string, optional) Name of a raw p-value column to use as a
+  fallback when \code{logp_col} is not found. Default: 'pval'.}
 }
 \description{
 Read association summary statistics and append normalized columns.
+The input must contain chromosome, position, and either a -log10(p-value)
+column or a raw p-value column. If a raw p-value column is supplied (via
+\code{pval_col}), it is converted to -log10(p-value) automatically.
 }
 \examples{
-in_fn = system.file('extdata', 'gwas.tsv', package = 'locuscomparer')
-d1 = read_metal(in_fn, chromosome_col = 'chromosome', position_col = 'position', logp_col = '-log10 p-value')
+# Using a data.frame with a raw p-value column:
+df = data.frame(chromosome = '1', position = 1:10, pval = 10^-(1:10))
+d1 = read_metal(df, chromosome_col = 'chromosome', position_col = 'position', pval_col = 'pval')
 }
