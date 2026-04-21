@@ -32,13 +32,21 @@ read_metal=function(in_fn, chromosome_col='chromosome', position_col='position',
         stop(sprintf('Missing required columns: %s', paste(missing_cols, collapse = ', ')))
     }
 
-    d = d[, required_cols]
-    colnames(d) = c('chr', 'pos', 'logp')
+    d = data.frame(
+        chr = d[[chromosome_col]],
+        pos = d[[position_col]],
+        logp = d[[logp_col]],
+        stringsAsFactors = FALSE
+    )
     d$chr = as.character(d$chr)
     d$pos = as.numeric(d$pos)
     d$logp = as.numeric(d$logp)
-    d$snp_id = paste0(d$chr, ':', d$pos)
+    d$snp_id = .create_snp_id(d$chr, d$pos)
     return(d[,c('chr','pos','logp','snp_id')])
+}
+
+.create_snp_id = function(chr, pos){
+    paste0(chr, ':', pos)
 }
 
 .normalize_snp_map = function(snp_map){
@@ -52,7 +60,7 @@ read_metal=function(in_fn, chromosome_col='chromosome', position_col='position',
     colnames(res) = c('chr', 'pos', 'rsid')
     res$chr = as.character(res$chr)
     res$pos = as.numeric(res$pos)
-    res$snp_id = paste0(res$chr, ':', res$pos)
+    res$snp_id = .create_snp_id(res$chr, res$pos)
     return(res)
 }
 
@@ -68,7 +76,7 @@ read_metal=function(in_fn, chromosome_col='chromosome', position_col='position',
     res$chr = as.character(res$chr)
     res$pos = as.numeric(res$pos)
     res$r2 = as.numeric(res$r2)
-    res$snp_id = paste0(res$chr, ':', res$pos)
+    res$snp_id = .create_snp_id(res$chr, res$pos)
     return(res)
 }
 
@@ -162,30 +170,31 @@ retrieve_LD = function(chr,snp,population){
 #' get_lead_snp(merged)
 #' @export
 get_lead_snp = function(merged, snp = NULL){
-    if (is.null(snp)) {
-        snp = merged[which.max(merged$logp1 + merged$logp2), 'snp_id']
+    lead_snp_id = snp
+    if (is.null(lead_snp_id)) {
+        lead_snp_id = merged[which.max(merged$logp1 + merged$logp2), 'snp_id']
     }
     else {
-        if (!snp %in% merged$snp_id) {
-            stop(sprintf("%s not found in the intersection of in_fn1 and in_fn2.", snp))
+        if (!lead_snp_id %in% merged$snp_id) {
+            stop(sprintf("%s not found in the intersection of in_fn1 and in_fn2.", lead_snp_id))
         }
     }
-    return(as.character(snp))
+    return(as.character(lead_snp_id))
 }
 
 #' Assign color to each SNP according to LD.
-#' @param rsid (character vector) A vector of SNP identifiers in "CHR:POS" format on which to assign color.
+#' @param snp_id (character vector) A vector of SNP identifiers in "CHR:POS" format on which to assign color.
 #' @param snp (string) Lead SNP identifier in "CHR:POS" format. This SNP will be colored purple.
 #' Other SNPs will be assigned color based on their LD with the lead SNP.
 #' @param ld (data.frame) A data.frame with columns chromosome, position, and r2.
 #' @examples
 #' # the data.frame merged comes from the example for `get_lead_snp()`.
 #' # the data.frame ld comes from the example for `retrieve_LD()`.
-#' color = assign_color(rsid = merged$rsid, snp = 'rs9349379', ld)
+#' color = assign_color(snp_id = merged$snp_id, snp = '1:12345', ld)
 #' @export
-assign_color=function(rsid,snp,ld=NULL){
+assign_color=function(snp_id,snp,ld=NULL){
 
-    color = data.frame(snp_id = rsid, stringsAsFactors = FALSE)
+    color = data.frame(snp_id = snp_id, stringsAsFactors = FALSE)
     color$color = 'blue4'
 
     ld_norm = .normalize_lead_ld(ld)
@@ -217,7 +226,7 @@ assign_color=function(rsid,snp,ld=NULL){
 #' this can also be a single string.
 #' @examples
 #' # The data.frame merged comes from the example for `get_lead_snp()`.
-#' merged = add_label(merged, 'rs9349379')
+#' merged = add_label(merged, '1:12345')
 add_label = function(merged, snp, snp_map = NULL){
     label_value = snp
     snp_map = .normalize_snp_map(snp_map)
@@ -447,7 +456,7 @@ locuscompare = function(in_fn1, in_fn2, chromosome_col1 = "chromosome", position
 
     merged = merge(d1, d2, by = c("chr", "pos", "snp_id"), suffixes = c("1", "2"), all = FALSE)
     if (nrow(merged) < min_match) {
-        stop(sprintf('Only %d overlapping variants were found between in_fn1 and in_fn2; this may indicate a genome build mismatch.', nrow(merged)))
+        stop(sprintf('Only %d overlapping variants were found between in_fn1 and in_fn2 (minimum required: %d); possible causes include genome build mismatch or dataset filtering differences.', nrow(merged), min_match))
     }
 
     chr = unique(merged$chr)
@@ -469,17 +478,22 @@ locuscompare = function(in_fn1, in_fn2, chromosome_col1 = "chromosome", position
 
     ld = .normalize_lead_ld(lead_ld)
     if (is.null(ld) && !is.null(snp_map)) {
-        lead_rsid = snp_map$rsid[match(lead_snp, snp_map$snp_id)]
+        lead_idx = match(lead_snp, snp_map$snp_id)
+        if (!is.na(lead_idx)) {
+            lead_rsid = snp_map$rsid[lead_idx]
+        } else {
+            lead_rsid = NA
+        }
         if (!is.na(lead_rsid) && nzchar(lead_rsid)) {
             ld_backup = tryCatch(
                 retrieve_LD(chr, lead_rsid, population),
                 error = function(e) NULL
             )
             if (!is.null(ld_backup) && nrow(ld_backup) > 0) {
-                snp_lookup = snp_map[, c('rsid', 'chr', 'pos')]
+                snp_lookup = snp_map[, c('snp_id', 'rsid', 'chr', 'pos')]
                 ld_join = merge(ld_backup[, c('SNP_B', 'R2')], snp_lookup, by.x = 'SNP_B', by.y = 'rsid', all.x = FALSE)
                 if (nrow(ld_join) > 0) {
-                    ld = data.frame(chromosome = ld_join$chr, position = ld_join$pos, r2 = ld_join$R2, stringsAsFactors = FALSE)
+                    ld = .normalize_lead_ld(data.frame(chromosome = ld_join$chr, position = ld_join$pos, r2 = ld_join$R2, stringsAsFactors = FALSE))
                 }
             }
         }

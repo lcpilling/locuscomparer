@@ -4,10 +4,10 @@
 \alias{assign_color}
 \title{Assign color to each SNP according to LD.}
 \usage{
-assign_color(rsid, snp, ld = NULL)
+assign_color(snp_id, snp, ld = NULL)
 }
 \arguments{
-\item{rsid}{(character vector) A vector of SNP identifiers in "CHR:POS" format on which to assign color.}
+\item{snp_id}{(character vector) A vector of SNP identifiers in "CHR:POS" format on which to assign color.}
 
 \item{snp}{(string) Lead SNP identifier in "CHR:POS" format. This SNP will be colored purple.
 Other SNPs will be assigned color based on their LD with the lead SNP.}
@@ -20,5 +20,5 @@ Assign color to each SNP according to LD.
 \examples{
 # the data.frame merged comes from the example for `get_lead_snp()`.
 # the data.frame ld comes from the example for `retrieve_LD()`.
-color = assign_color(rsid = merged$snp_id, snp = '1:12345', ld)
+color = assign_color(snp_id = merged$snp_id, snp = '1:12345', ld)
 }

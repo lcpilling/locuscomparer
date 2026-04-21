@@ -8,11 +8,11 @@ lead_ld = data.frame(chromosome = '1', position = 1:12, r2 = seq(0, 1, length.ou
 snp_map = data.frame(chromosome = '1', position = 12, rsid = 'rsLead', stringsAsFactors = FALSE)
 
 test_that('locuscompare works with chr/pos/logp input and optional lead_ld',{
-    p = locuscompare(in_fn1 = d1, in_fn2 = d2, lead_ld = lead_ld, snp = snp_map, min_match = 5)
+    p = locuscompare(in_fn1 = d1, in_fn2 = d2, lead_ld = lead_ld, snp = snp_map, min_match = 10)
     expect_true(inherits(p, 'gg') || inherits(p, 'gtable') || inherits(p, 'ggplot'))
 })
 
 test_that('locuscompare errors on too few overlaps',{
     d2_small = d2[d2$position <= 2, ]
-    expect_error(locuscompare(in_fn1 = d1, in_fn2 = d2_small, min_match = 5))
+    expect_error(locuscompare(in_fn1 = d1, in_fn2 = d2_small, min_match = 10))
 })
