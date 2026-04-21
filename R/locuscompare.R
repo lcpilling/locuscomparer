@@ -175,18 +175,14 @@ retrieve_LD = function(chr,snp,population){
 }
 
 #' Get the lead SNP from the list of SNPs in input data.frame
-#' The lead SNP is defined as the SNP with the lowest sum of p-values
+#' The lead SNP is defined as the SNP with the largest sum of -log10(p-values)
 #' from the two studies.
 #' @param merged (data.frame) Input data.frame, which is a result by merging two association studies.
 #' @param snp (string, optional) Lead SNP coordinate (CHR:POS). If NULL, the function will select the
 #' lead SNP based on the largest sum of -log10(p-values) from the two studies.
 #' @examples
-#' # Select the lead SNP
-#' in_fn_1 = system.file('extdata', 'gwas.tsv', package = 'locuscomparer')
-#' d1 = read_metal(in_fn_1, marker_col = 'rsid', pval_col = 'pval')
-#' in_fn_2 = system.file('extdata', 'gwas.tsv', package = 'locuscomparer')
-#' d1 = read_metal(in_fn_2, marker_col = 'rsid', pval_col = 'pval')
-#' merged = merge(d1, d2, by = "rsid", suffixes = c("1", "2"), all = FALSE)
+#' merged = data.frame(chr = '1', pos = 1:3, snp_id = c('1:1','1:2','1:3'),
+#'                     logp1 = c(2, 6, 3), logp2 = c(1, 4, 10))
 #' get_lead_snp(merged)
 #' @export
 get_lead_snp = function(merged, snp = NULL){
@@ -206,11 +202,12 @@ get_lead_snp = function(merged, snp = NULL){
 #' @param snp_id (character vector) A vector of SNP identifiers in "CHR:POS" format on which to assign color.
 #' @param snp (string) Lead SNP identifier in "CHR:POS" format. This SNP will be colored purple.
 #' Other SNPs will be assigned color based on their LD with the lead SNP.
-#' @param ld (data.frame) A data.frame with columns chromosome, position, and r2.
+#' @param ld (data.frame, optional) A data.frame with columns chromosome, position, and r2.
+#' If NULL, all non-lead SNPs are colored blue4.
 #' @examples
-#' # the data.frame merged comes from the example for `get_lead_snp()`.
-#' # the data.frame ld comes from the example for `retrieve_LD()`.
-#' color = assign_color(snp_id = merged$snp_id, snp = '1:12345', ld)
+#' ld = data.frame(chromosome = '1', position = 1:5, r2 = c(1, 0.8, 0.5, 0.3, 0.1))
+#' snp_ids = paste0('1:', 1:6)
+#' color = assign_color(snp_id = snp_ids, snp = '1:1', ld = ld)
 #' @export
 assign_color=function(snp_id,snp,ld=NULL){
 
@@ -393,7 +390,7 @@ make_locuszoom=function(metal,title,chr,color,shape,size,ylab_linebreak=FALSE){
 #' If FALSE, the y-axis title and '-log10(p-value)'. will be on the same line. Default: FALSE.
 #' @examples
 #' # The data.frame `merged` comes from the example of `add_label()`.
-#' # the data.frame `ld` comes from the example for `retrieve_LD()`.
+#' # ld is a data.frame with columns chromosome, position, r2.
 #' make_combined_plot(merged, 'GWAS', 'eQTL', ld, chr)
 #' @export
 make_combined_plot = function (merged, title1, title2, ld, chr, snp = NULL, snp_map = NULL,
@@ -481,7 +478,10 @@ locuscompare = function(in_fn1, in_fn2, chromosome_col1 = "chromosome", position
 
     merged = merge(d1, d2, by = c("chr", "pos", "snp_id"), suffixes = c("1", "2"), all = FALSE)
     if (nrow(merged) < min_match) {
-        stop(sprintf('Only %d overlapping variants were found between in_fn1 and in_fn2 (minimum required: %d); possible causes include genome build mismatch or dataset filtering differences.', nrow(merged), min_match))
+        stop(sprintf(
+            'Only %d overlapping variants were found between the two datasets (minimum required: %d); possible causes include genome build mismatch, chromosome naming differences (e.g. "chr1" vs "1"), or dataset filtering differences.',
+            nrow(merged), min_match
+        ))
     }
 
     chr = unique(merged$chr)

@@ -21,5 +21,8 @@ test_that('locuscompare works with raw pval columns (auto-converts to -log10)',{
 
 test_that('locuscompare errors on too few overlaps',{
     d2_small = d2[d2$position <= 2, ]
-    expect_error(locuscompare(in_fn1 = d1, in_fn2 = d2_small, min_match = 10))
+    expect_error(
+        locuscompare(in_fn1 = d1, in_fn2 = d2_small, min_match = 10),
+        regexp = 'overlapping variants'
+    )
 })
