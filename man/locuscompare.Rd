@@ -4,32 +4,46 @@
 \alias{locuscompare}
 \title{Make a locuscompare plot.}
 \usage{
-locuscompare(in_fn1, in_fn2, marker_col1 = "rsid", pval_col1 = "pval",
-  title1 = "eQTL", marker_col2 = "rsid", pval_col2 = "pval",
-  title2 = "GWAS", snp = NULL, population = "EUR", combine = TRUE,
-  legend = TRUE, legend_position = c("bottomright", "topright",
-  "topleft"), lz_ylab_linebreak = FALSE, genome = c("hg19", "hg38"))
+locuscompare(in_fn1, in_fn2, chromosome_col1 = "chromosome",
+  position_col1 = "position", logp_col1 = "-log10 p-value",
+  title1 = "eQTL", chromosome_col2 = "chromosome",
+  position_col2 = "position", logp_col2 = "-log10 p-value",
+  title2 = "GWAS", snp = NULL, lead_ld = NULL, population = "EUR",
+  min_match = 10, combine = TRUE, legend = TRUE,
+  legend_position = c("bottomright", "topright", "topleft"),
+  lz_ylab_linebreak = FALSE)
 }
 \arguments{
 \item{in_fn1}{(string) Path to the input file for study 1.}
 
 \item{in_fn2}{(string) Path to the input file for study 2.}
 
-\item{marker_col1}{(string, optional) Name of the marker column. Default: 'rsid'.}
+\item{chromosome_col1}{(string, optional) Name of the chromosome column. Default: 'chromosome'.}
 
-\item{pval_col1}{(string, optional) Name of the p-value column. Default: 'pval'.}
+\item{position_col1}{(string, optional) Name of the position column. Default: 'position'.}
+
+\item{logp_col1}{(string, optional) Name of the -log10(p-value) column. Default: '-log10 p-value'.}
 
 \item{title1}{(string) The title for the x-axis.}
 
-\item{marker_col2}{(string, optional) Name of the marker column. Default: 'rsid'.}
+\item{chromosome_col2}{(string, optional) Name of the chromosome column. Default: 'chromosome'.}
 
-\item{pval_col2}{(string, optional) Name of the p-value column. Default: 'pval'.}
+\item{position_col2}{(string, optional) Name of the position column. Default: 'position'.}
+
+\item{logp_col2}{(string, optional) Name of the -log10(p-value) column. Default: '-log10 p-value'.}
 
 \item{title2}{(string) The title for the y-axis.}
 
-\item{snp}{(string, optional) SNP rsID. If NULL, the function will select the lead SNP. Default: NULL.}
+\item{snp}{(string or data.frame, optional) Either a lead SNP identifier ("CHR:POS") or a
+data.frame with columns chromosome, position, and rsid for optional RSID labeling. Default: NULL.}
+
+\item{lead_ld}{(data.frame, optional) A data.frame with columns chromosome, position, and r2 for
+LD with the lead SNP. If omitted, a fallback database retrieval is attempted and silently ignored if unavailable.}
 
 \item{population}{(string, optional) One of the 5 popuations from 1000 Genomes: 'AFR', 'AMR', 'EAS', 'EUR', and 'SAS'. Default: 'EUR'.}
+
+\item{min_match}{(integer, optional) Minimum number of overlapping variants required between datasets.
+If fewer overlaps are found, an error is raised. Default: 10.}
 
 \item{combine}{(boolean, optional) Should the three plots be combined into one plot? If FALSE, a list of
 three plots will be returned. Default: TRUE.}
@@ -39,8 +53,6 @@ three plots will be returned. Default: TRUE.}
 \item{legend_position}{(string, optional) Either 'bottomright','topright', or 'topleft'. Default: 'bottomright'.}
 
 \item{lz_ylab_linebreak}{(boolean, optional) Whether to break the line of y-axis of the locuszoom plot.}
-
-\item{genome}{(string, optional) Genome assembly, either 'hg19' or 'hg38'. Default: 'hg19'.}
 }
 \description{
 Make a locuscompare plot.

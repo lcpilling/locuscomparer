@@ -1,14 +1,17 @@
 context('Test assign color')
 
-SNP_B = paste0('rs', 0:10)
-R2 = seq(1, 0, -0.1)
-ld = data.frame(SNP_A = 'rs1', SNP_B, R2)
-rsid = paste0('rs',0:11)
+positions = 0:11
+rsid = paste0('1:', positions)
+ld = data.frame(
+    chromosome = '1',
+    position = 0:10,
+    r2 = seq(1, 0, -0.1)
+)
 
-res = assign_color(rsid, 'rs1', ld)
+res = assign_color(rsid, '1:1', ld)
 
 test_that('assign_color',{
-    expect_equal(unname(res['rs1']),'purple')
-    expect_equal(unname(res['rs11']),'blue4')
-    expect_equal(unname(res['rs0']),'red')
+    expect_equal(unname(res['1:1']),'purple')
+    expect_equal(unname(res['1:11']),'blue4')
+    expect_equal(unname(res['1:0']),'red')
 })

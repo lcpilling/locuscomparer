@@ -1,18 +1,14 @@
-context('test get_position')
+context('test lead SNP selection')
 
-in_fn1 = system.file('extdata','gwas.tsv', package = 'locuscomparer')
-in_fn2 = system.file('extdata','eqtl.tsv', package = 'locuscomparer')
-marker_col1 = marker_col2 = 'rsid'
-pval_col1 = pval_col2 = 'pval'
-snp = NULL
-population = 'EUR'
+merged = data.frame(
+    chr = rep('1', 3),
+    pos = c(100, 200, 300),
+    snp_id = c('1:100', '1:200', '1:300'),
+    logp1 = c(2, 6, 3),
+    logp2 = c(1, 4, 10),
+    stringsAsFactors = FALSE
+)
 
-d1 = read_metal(in_fn1, marker_col1, pval_col1)
-d2 = read_metal(in_fn2, marker_col2, pval_col2)
-merged = merge(d1, d2, by = "rsid", suffixes = c("1", "2"), all = FALSE)
-
-res = get_position(merged)
-test_that('get_position returns the right position',{
-    expect_equal(res[1,'chr'], '6')
-    expect_equal(res[1,'pos'], 12366743)
+test_that('get_lead_snp uses max sum of logp values',{
+    expect_equal(get_lead_snp(merged), '1:300')
 })

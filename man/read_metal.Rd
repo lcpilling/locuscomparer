@@ -2,25 +2,24 @@
 % Please edit documentation in R/locuscompare.R
 \name{read_metal}
 \alias{read_metal}
-\title{Read association summary statistics from file and append column.
-The file must contain 2 columns: markers, i.e SNPs, and p-value.
-The marker column should contain SNP rsIDs.}
+\title{Read association summary statistics and append normalized columns.}
 \usage{
-read_metal(in_fn, marker_col = "rsid", pval_col = "pval")
+read_metal(in_fn, chromosome_col = "chromosome", position_col = "position",
+  logp_col = "-log10 p-value")
 }
 \arguments{
 \item{in_fn}{(string) Path to the input file.}
 
-\item{marker_col}{(string, optional) Name of the marker column. Default: 'rsid'.}
+\item{chromosome_col}{(string, optional) Name of the chromosome column. Default: 'chromosome'.}
 
-\item{pval_col}{(string, optional) Name of the p-value column. Default: 'pval'.}
+\item{position_col}{(string, optional) Name of the position column. Default: 'position'.}
+
+\item{logp_col}{(string, optional) Name of the -log10(p-value) column. Default: '-log10 p-value'.}
 }
 \description{
-Read association summary statistics from file and append column.
-The file must contain 2 columns: markers, i.e SNPs, and p-value.
-The marker column should contain SNP rsIDs.
+Read association summary statistics and append normalized columns.
 }
 \examples{
 in_fn = system.file('extdata', 'gwas.tsv', package = 'locuscomparer')
-d1 = read_metal(in_fn, marker_col = 'rsid', pval_col = 'pval')
+d1 = read_metal(in_fn, chromosome_col = 'chromosome', position_col = 'position', logp_col = '-log10 p-value')
 }

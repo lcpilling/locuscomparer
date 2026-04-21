@@ -1,22 +1,20 @@
-#' Read association summary statistics from file and append column.
-#' The file must contain 2 columns: markers, i.e SNPs, and p-value.
-#' The marker column should contain SNP rsIDs.
+#' Read association summary statistics and append normalized columns.
+#' The input must contain chromosome, position, and -log10(p-value).
 #'
 #' @param in_fn (string) Path to the input file.
-#' @param marker_col (string, optional) Name of the marker column. Default: 'rsid'.
-#' @param pval_col (string, optional) Name of the p-value column. Default: 'pval'.
+#' @param chromosome_col (string, optional) Name of the chromosome column. Default: 'chromosome'.
+#' @param position_col (string, optional) Name of the position column. Default: 'position'.
+#' @param logp_col (string, optional) Name of the -log10(p-value) column. Default: '-log10 p-value'.
 #' @examples
 #' in_fn = system.file('extdata', 'gwas.tsv', package = 'locuscomparer')
-#' d1 = read_metal(in_fn, marker_col = 'rsid', pval_col = 'pval')
+#' d1 = read_metal(in_fn, chromosome_col = 'chromosome', position_col = 'position', logp_col = '-log10 p-value')
 #' @export
-read_metal=function(in_fn,marker_col='rsid',pval_col='pval'){
+read_metal=function(in_fn, chromosome_col='chromosome', position_col='position', logp_col='-log10 p-value'){
     # message('Reading ', in_fn)
 
     if (is.character(in_fn)){
 
         d = read.table(in_fn, header = TRUE, stringsAsFactors = FALSE)
-        colnames(d)[which(colnames(d) == marker_col)] = 'rsid'
-        colnames(d)[which(colnames(d) == pval_col)] = 'pval'
 
     } else if (is.data.frame(in_fn)){
 
@@ -28,8 +26,50 @@ read_metal=function(in_fn,marker_col='rsid',pval_col='pval'){
 
     }
 
-    d$logp = -log10(d$pval)
-    return(d[,c('rsid','pval','logp')])
+    required_cols = c(chromosome_col, position_col, logp_col)
+    missing_cols = setdiff(required_cols, colnames(d))
+    if (length(missing_cols) > 0) {
+        stop(sprintf('Missing required columns: %s', paste(missing_cols, collapse = ', ')))
+    }
+
+    d = d[, required_cols]
+    colnames(d) = c('chr', 'pos', 'logp')
+    d$chr = as.character(d$chr)
+    d$pos = as.numeric(d$pos)
+    d$logp = as.numeric(d$logp)
+    d$snp_id = paste0(d$chr, ':', d$pos)
+    return(d[,c('chr','pos','logp','snp_id')])
+}
+
+.normalize_snp_map = function(snp_map){
+    if (is.null(snp_map)) return(NULL)
+    required_cols = c('chromosome', 'position', 'rsid')
+    missing_cols = setdiff(required_cols, colnames(snp_map))
+    if (length(missing_cols) > 0) {
+        stop(sprintf('The "snp" data.frame must contain columns: %s', paste(required_cols, collapse = ', ')))
+    }
+    res = snp_map[, required_cols]
+    colnames(res) = c('chr', 'pos', 'rsid')
+    res$chr = as.character(res$chr)
+    res$pos = as.numeric(res$pos)
+    res$snp_id = paste0(res$chr, ':', res$pos)
+    return(res)
+}
+
+.normalize_lead_ld = function(lead_ld){
+    if (is.null(lead_ld)) return(NULL)
+    required_cols = c('chromosome', 'position', 'r2')
+    missing_cols = setdiff(required_cols, colnames(lead_ld))
+    if (length(missing_cols) > 0) {
+        stop(sprintf('The "lead_ld" data.frame must contain columns: %s', paste(required_cols, collapse = ', ')))
+    }
+    res = lead_ld[, required_cols]
+    colnames(res) = c('chr', 'pos', 'r2')
+    res$chr = as.character(res$chr)
+    res$pos = as.numeric(res$pos)
+    res$r2 = as.numeric(res$r2)
+    res$snp_id = paste0(res$chr, ':', res$pos)
+    return(res)
 }
 
 #' Append two columns, chromosome (chr) and position (pos), to the input data.frame.
@@ -109,11 +149,9 @@ retrieve_LD = function(chr,snp,population){
 #' Get the lead SNP from the list of SNPs in input data.frame
 #' The lead SNP is defined as the SNP with the lowest sum of p-values
 #' from the two studies.
-#' @param merged (data.frame) Input data.frame, which is a result by merging two
-#' association studies.
-#' @param snp (string, optional) SNP rsID. If NULL, the function will select the
-#' lead SNP based on the sum of p-values from the two studies. If an rsID is supplied,
-#' the function will simply return the rsID.
+#' @param merged (data.frame) Input data.frame, which is a result by merging two association studies.
+#' @param snp (string, optional) Lead SNP coordinate (CHR:POS). If NULL, the function will select the
+#' lead SNP based on the largest sum of -log10(p-values) from the two studies.
 #' @examples
 #' # Select the lead SNP
 #' in_fn_1 = system.file('extdata', 'gwas.tsv', package = 'locuscomparer')
@@ -125,10 +163,10 @@ retrieve_LD = function(chr,snp,population){
 #' @export
 get_lead_snp = function(merged, snp = NULL){
     if (is.null(snp)) {
-        snp = merged[which.min(merged$pval1 + merged$pval2), 'rsid']
+        snp = merged[which.max(merged$logp1 + merged$logp2), 'snp_id']
     }
     else {
-        if (!snp %in% merged$rsid) {
+        if (!snp %in% merged$snp_id) {
             stop(sprintf("%s not found in the intersection of in_fn1 and in_fn2.", snp))
         }
     }
@@ -136,31 +174,36 @@ get_lead_snp = function(merged, snp = NULL){
 }
 
 #' Assign color to each SNP according to LD.
-#' @param rsid (character vector) A vector of rsIDs on which to assign color.
-#' @param snp (string) rsID for lead SNP. This SNP will be colored purple.
+#' @param rsid (character vector) A vector of SNP identifiers in "CHR:POS" format on which to assign color.
+#' @param snp (string) Lead SNP identifier in "CHR:POS" format. This SNP will be colored purple.
 #' Other SNPs will be assigned color based on their LD with the lead SNP.
-#' @param ld (data.frame) The output from `retrieve_LD()`.
+#' @param ld (data.frame) A data.frame with columns chromosome, position, and r2.
 #' @examples
 #' # the data.frame merged comes from the example for `get_lead_snp()`.
 #' # the data.frame ld comes from the example for `retrieve_LD()`.
 #' color = assign_color(rsid = merged$rsid, snp = 'rs9349379', ld)
 #' @export
-assign_color=function(rsid,snp,ld){
+assign_color=function(rsid,snp,ld=NULL){
 
-    ld = ld[ld$SNP_A==snp,]
-    ld$color = as.character(cut(ld$R2,breaks=c(0,0.2,0.4,0.6,0.8,1), labels=c('blue4','skyblue','darkgreen','orange','red'), include.lowest=TRUE))
+    color = data.frame(snp_id = rsid, stringsAsFactors = FALSE)
+    color$color = 'blue4'
 
-    color = data.frame(rsid, stringsAsFactors = FALSE)
-    color = merge(color, ld[, c('SNP_B', 'color')], by.x = 'rsid', by.y = 'SNP_B', all.x = TRUE)
-    color[is.na(color$color),'color'] = 'blue4'
-    if (snp %in% color$rsid){
-        color[rsid == snp,'color'] = 'purple'
-    } else {
-        color = rbind(color, data.frame(rsid = snp, color = 'purple'))
+    ld_norm = .normalize_lead_ld(ld)
+    if (!is.null(ld_norm) && nrow(ld_norm) > 0) {
+        ld_norm$color = as.character(cut(ld_norm$r2, breaks=c(0,0.2,0.4,0.6,0.8,1),
+                                        labels=c('blue4','skyblue','darkgreen','orange','red'),
+                                        include.lowest=TRUE))
+        idx = match(color$snp_id, ld_norm$snp_id)
+        has_match = !is.na(idx)
+        color$color[has_match] = ld_norm$color[idx[has_match]]
+    }
+
+    if (snp %in% color$snp_id){
+        color[color$snp_id == snp, 'color'] = 'purple'
     }
 
     res = color$color
-    names(res) = color$rsid
+    names(res) = color$snp_id
 
     return(res)
 }
@@ -175,8 +218,16 @@ assign_color=function(rsid,snp,ld){
 #' @examples
 #' # The data.frame merged comes from the example for `get_lead_snp()`.
 #' merged = add_label(merged, 'rs9349379')
-add_label = function(merged, snp){
-    merged$label = ifelse(merged$rsid %in% snp, merged$rsid, '')
+add_label = function(merged, snp, snp_map = NULL){
+    label_value = snp
+    snp_map = .normalize_snp_map(snp_map)
+    if (!is.null(snp_map)) {
+        i = match(snp, snp_map$snp_id)
+        if (!is.na(i) && !is.na(snp_map$rsid[i]) && nzchar(snp_map$rsid[i])) {
+            label_value = snp_map$rsid[i]
+        }
+    }
+    merged$label = ifelse(merged$snp_id %in% snp, label_value, '')
     return(merged)
 }
 
@@ -212,9 +263,9 @@ add_label = function(merged, snp){
 make_scatterplot = function (merged, title1, title2, color, shape, size, legend = TRUE, legend_position = c('bottomright','topright','topleft')) {
 
     p = ggplot(merged, aes(logp1, logp2)) +
-        geom_point(aes(fill = rsid, size = rsid, shape = rsid), alpha = 0.8) +
+        geom_point(aes(fill = snp_id, size = snp_id, shape = snp_id), alpha = 0.8) +
         geom_point(data = merged[merged$label != "",],
-                   aes(logp1, logp2, fill = rsid, size = rsid, shape = rsid)) +
+                   aes(logp1, logp2, fill = snp_id, size = snp_id, shape = snp_id)) +
         xlab(bquote(.(title1) ~ -log[10] * '(P)')) +
         ylab(bquote(.(title2) ~ -log[10] * '(P)')) +
         scale_fill_manual(values = color, guide = "none") +
@@ -275,8 +326,8 @@ make_scatterplot = function (merged, title1, title2, color, shape, size, legend 
 make_locuszoom=function(metal,title,chr,color,shape,size,ylab_linebreak=FALSE){
 
     p = ggplot(metal,aes(x=pos,logp))+
-        geom_point(aes(fill=rsid,size=rsid,shape=rsid),alpha=0.8)+
-        geom_point(data=metal[metal$label!='',],aes(x=pos,logp,fill=rsid,size=rsid,shape=rsid))+
+        geom_point(aes(fill=snp_id,size=snp_id,shape=snp_id),alpha=0.8)+
+        geom_point(data=metal[metal$label!='',],aes(x=pos,logp,fill=snp_id,size=snp_id,shape=snp_id))+
         scale_fill_manual(values=color,guide='none')+
         scale_shape_manual(values=shape,guide='none')+
         scale_size_manual(values=size,guide='none')+
@@ -316,7 +367,7 @@ make_locuszoom=function(metal,title,chr,color,shape,size,ylab_linebreak=FALSE){
 #' # the data.frame `ld` comes from the example for `retrieve_LD()`.
 #' make_combined_plot(merged, 'GWAS', 'eQTL', ld, chr)
 #' @export
-make_combined_plot = function (merged, title1, title2, ld, chr, snp = NULL,
+make_combined_plot = function (merged, title1, title2, ld, chr, snp = NULL, snp_map = NULL,
                                combine = TRUE, legend = TRUE,
                                legend_position = c('bottomright','topright','topleft'),
                                lz_ylab_linebreak=FALSE) {
@@ -324,24 +375,24 @@ make_combined_plot = function (merged, title1, title2, ld, chr, snp = NULL,
     snp = get_lead_snp(merged, snp)
     # print(sprintf("INFO - %s", snp))
 
-    color = assign_color(merged$rsid, snp, ld)
+    color = assign_color(merged$snp_id, snp, ld)
 
-    shape = ifelse(merged$rsid == snp, 23, 21)
-    names(shape) = merged$rsid
+    shape = ifelse(merged$snp_id == snp, 23, 21)
+    names(shape) = merged$snp_id
 
-    size = ifelse(merged$rsid == snp, 3, 2)
-    names(size) = merged$rsid
+    size = ifelse(merged$snp_id == snp, 3, 2)
+    names(size) = merged$snp_id
 
-    merged = add_label(merged, snp)
+    merged = add_label(merged, snp, snp_map)
 
     p1 = make_scatterplot(merged, title1, title2, color,
                           shape, size, legend, legend_position)
 
-    metal1 = merged[,c('rsid', 'logp1', 'chr', 'pos', 'label')]
+    metal1 = merged[,c('snp_id', 'logp1', 'chr', 'pos', 'label')]
     colnames(metal1)[which(colnames(metal1) == 'logp1')] = 'logp'
     p2 = make_locuszoom(metal1, title1, chr, color, shape, size, lz_ylab_linebreak)
 
-    metal2 = merged[,c('rsid', 'logp2', 'chr', 'pos', 'label')]
+    metal2 = merged[,c('snp_id', 'logp2', 'chr', 'pos', 'label')]
     colnames(metal2)[which(colnames(metal2) == 'logp2')] = 'logp'
     p3 = make_locuszoom(metal2, title2, chr, color, shape, size, lz_ylab_linebreak)
 
@@ -359,14 +410,21 @@ make_combined_plot = function (merged, title1, title2, ld, chr, snp = NULL,
 #' Make a locuscompare plot.
 #' @param in_fn1 (string) Path to the input file for study 1.
 #' @param in_fn2 (string) Path to the input file for study 2.
-#' @param marker_col1 (string, optional) Name of the marker column. Default: 'rsid'.
-#' @param pval_col1 (string, optional) Name of the p-value column. Default: 'pval'.
+#' @param chromosome_col1 (string, optional) Name of the chromosome column. Default: 'chromosome'.
+#' @param position_col1 (string, optional) Name of the position column. Default: 'position'.
+#' @param logp_col1 (string, optional) Name of the -log10(p-value) column. Default: '-log10 p-value'.
 #' @param title1 (string) The title for the x-axis.
-#' @param marker_col2 (string, optional) Name of the marker column. Default: 'rsid'.
-#' @param pval_col2 (string, optional) Name of the p-value column. Default: 'pval'.
+#' @param chromosome_col2 (string, optional) Name of the chromosome column. Default: 'chromosome'.
+#' @param position_col2 (string, optional) Name of the position column. Default: 'position'.
+#' @param logp_col2 (string, optional) Name of the -log10(p-value) column. Default: '-log10 p-value'.
 #' @param title2 (string) The title for the y-axis.
-#' @param snp (string, optional) SNP rsID. If NULL, the function will select the lead SNP. Default: NULL.
+#' @param snp (string or data.frame, optional) Either a lead SNP identifier ("CHR:POS") or a
+#' data.frame with columns chromosome, position, and rsid for optional RSID labeling. Default: NULL.
+#' @param lead_ld (data.frame, optional) A data.frame with columns chromosome, position, and r2 for
+#' LD with the lead SNP. If omitted, a fallback database retrieval is attempted and silently ignored if unavailable.
 #' @param population (string, optional) One of the 5 popuations from 1000 Genomes: 'AFR', 'AMR', 'EAS', 'EUR', and 'SAS'. Default: 'EUR'.
+#' @param min_match (integer, optional) Minimum number of overlapping variants required between datasets.
+#' If fewer overlaps are found, an error is raised. Default: 10.
 #' @param combine (boolean, optional) Should the three plots be combined into one plot? If FALSE, a list of
 #' three plots will be returned. Default: TRUE.
 #' @param legend (boolean, optional) Should the legend be shown? Default: TRUE.
@@ -378,25 +436,56 @@ make_combined_plot = function (merged, title1, title2, ld, chr, snp = NULL,
 #' in_fn2 = system.file('extdata','eqtl.tsv', package = 'locuscomparer')
 #' locuscompare(in_fn1 = in_fn1, in_fn2 = in_fn2)
 #' @export
-locuscompare = function(in_fn1, in_fn2, marker_col1 = "rsid", pval_col1 = "pval",
-                 title1 = "eQTL",marker_col2 = "rsid", pval_col2 = "pval", title2 = "GWAS",
-                 snp = NULL, population = "EUR", combine = TRUE, legend = TRUE,
+locuscompare = function(in_fn1, in_fn2, chromosome_col1 = "chromosome", position_col1 = "position",
+                 logp_col1 = "-log10 p-value", title1 = "eQTL", chromosome_col2 = "chromosome",
+                 position_col2 = "position", logp_col2 = "-log10 p-value", title2 = "GWAS",
+                 snp = NULL, lead_ld = NULL, population = "EUR", min_match = 10, combine = TRUE, legend = TRUE,
                  legend_position = c('bottomright','topright','topleft'),
-                 lz_ylab_linebreak = FALSE, genome = c('hg19','hg38')) {
-    d1 = read_metal(in_fn1, marker_col1, pval_col1)
-    d2 = read_metal(in_fn2, marker_col2, pval_col2)
+                 lz_ylab_linebreak = FALSE) {
+    d1 = read_metal(in_fn1, chromosome_col1, position_col1, logp_col1)
+    d2 = read_metal(in_fn2, chromosome_col2, position_col2, logp_col2)
 
-    merged = merge(d1, d2, by = "rsid", suffixes = c("1", "2"), all = FALSE)
-    genome = match.arg(genome)
-    merged = get_position(merged, genome)
+    merged = merge(d1, d2, by = c("chr", "pos", "snp_id"), suffixes = c("1", "2"), all = FALSE)
+    if (nrow(merged) < min_match) {
+        stop(sprintf('Only %d overlapping variants were found between in_fn1 and in_fn2; this may indicate a genome build mismatch.', nrow(merged)))
+    }
 
     chr = unique(merged$chr)
     if (length(chr) != 1) stop('There must be one and only one chromosome.')
 
-    snp = get_lead_snp(merged, snp)
-    ld = retrieve_LD(chr, snp, population)
-    p = make_combined_plot(merged, title1, title2, ld, chr, snp, combine,
+    snp_map = NULL
+    lead_snp = NULL
+    if (!is.null(snp)) {
+        if (is.data.frame(snp)) {
+            snp_map = .normalize_snp_map(snp)
+        } else if (is.character(snp) && length(snp) == 1) {
+            lead_snp = snp
+        } else {
+            stop('The "snp" argument must be NULL, a lead SNP string (CHR:POS), or a data.frame with chromosome, position, rsid.')
+        }
+    }
+
+    lead_snp = get_lead_snp(merged, lead_snp)
+
+    ld = .normalize_lead_ld(lead_ld)
+    if (is.null(ld) && !is.null(snp_map)) {
+        lead_rsid = snp_map$rsid[match(lead_snp, snp_map$snp_id)]
+        if (!is.na(lead_rsid) && nzchar(lead_rsid)) {
+            ld_backup = tryCatch(
+                retrieve_LD(chr, lead_rsid, population),
+                error = function(e) NULL
+            )
+            if (!is.null(ld_backup) && nrow(ld_backup) > 0) {
+                snp_lookup = snp_map[, c('rsid', 'chr', 'pos')]
+                ld_join = merge(ld_backup[, c('SNP_B', 'R2')], snp_lookup, by.x = 'SNP_B', by.y = 'rsid', all.x = FALSE)
+                if (nrow(ld_join) > 0) {
+                    ld = data.frame(chromosome = ld_join$chr, position = ld_join$pos, r2 = ld_join$R2, stringsAsFactors = FALSE)
+                }
+            }
+        }
+    }
+
+    p = make_combined_plot(merged, title1, title2, ld, chr, lead_snp, snp_map, combine,
                            legend, legend_position, lz_ylab_linebreak)
     return(p)
 }
-

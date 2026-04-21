@@ -6,24 +6,26 @@
 plot. Each locuszoom plot represent an association study.}
 \usage{
 make_combined_plot(merged, title1, title2, ld, chr, snp = NULL,
-  combine = TRUE, legend = TRUE, legend_position = c("bottomright",
-  "topright", "topleft"), lz_ylab_linebreak = FALSE)
+  snp_map = NULL, combine = TRUE, legend = TRUE,
+  legend_position = c("bottomright", "topright", "topleft"),
+  lz_ylab_linebreak = FALSE)
 }
 \arguments{
 \item{merged}{(data.frame) An input data.frame which has the following
-columns: rsid, pval1 (p-value for study 1), logp1 (p-value for study 2),
-logp1 (log p-value for study 1), logp2 (log p-value for study 2), chr, pos.
+columns: chr, pos, snp_id, logp1, and logp2.
 See the example for `get_lead_snp()` on how to generate this data.frame.}
 
 \item{title1}{(string) The title for the x-axis.}
 
 \item{title2}{(string) The title for the y-axis.}
 
-\item{ld}{(data.frame) The output from `retrieve_LD()`.}
+\item{ld}{(data.frame) A data.frame with columns chromosome, position, and r2.}
 
 \item{chr}{(string) Chromosome name. e.g. '22'. Notice that the name should not contain 'chr'.}
 
-\item{snp}{(string, optional) SNP rsID. If NULL, the function will select the lead SNP. Default: NULL.}
+\item{snp}{(string, optional) SNP coordinate in CHR:POS format. If NULL, the function will select the lead SNP. Default: NULL.}
+
+\item{snp_map}{(data.frame, optional) Data.frame with columns chromosome, position, and rsid used for optional lead label display.}
 
 \item{combine}{(boolean, optional) Should the three plots be combined into one plot? If FALSE, a list of
 three plots will be returned. Default: TRUE.}

@@ -1,17 +1,18 @@
 context('Test locuscompare')
 
-in_fn1 = system.file('extdata','gwas.tsv', package = 'locuscomparer')
-in_fn2 = system.file('extdata','eqtl.tsv', package = 'locuscomparer')
-marker_col1 = 'rsid'
-marker_col2 = 'rsid'
-pval_col1 = pval_col2 = 'pval'
-snp = NULL
-population = 'EUR'
-title1 = 'GWAS'; title2 = 'eQTL'
-legend = combine = TRUE
-lz_ylab_linebreak = FALSE
-legend_position = 'bottomright'
+d1 = data.frame(chromosome = '1', position = 1:12, check.names = FALSE)
+d1[['-log10 p-value']] = seq(1, 12)
+d2 = data.frame(chromosome = '1', position = 1:12, check.names = FALSE)
+d2[['-log10 p-value']] = seq(12, 1)
+lead_ld = data.frame(chromosome = '1', position = 1:12, r2 = seq(0, 1, length.out = 12))
+snp_map = data.frame(chromosome = '1', position = 12, rsid = 'rsLead', stringsAsFactors = FALSE)
 
-p = locuscompare(in_fn1 = in_fn1, in_fn2 = in_fn2)
-p
+test_that('locuscompare works with chr/pos/logp input and optional lead_ld',{
+    p = locuscompare(in_fn1 = d1, in_fn2 = d2, lead_ld = lead_ld, snp = snp_map, min_match = 5)
+    expect_true(inherits(p, 'gg') || inherits(p, 'gtable') || inherits(p, 'ggplot'))
+})
 
+test_that('locuscompare errors on too few overlaps',{
+    d2_small = d2[d2$position <= 2, ]
+    expect_error(locuscompare(in_fn1 = d1, in_fn2 = d2_small, min_match = 5))
+})

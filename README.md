@@ -13,13 +13,17 @@ devtools::install_github("boxiangliu/locuscomparer")
 
 ## 2. Example
 
-To illustrate the use of locuscompare, we use the GWAS dataset from Nikpay et al. (2015) and the coronary artery eQTL dataset from GTEx v7 at the *PHACTR1* locus: 
+To illustrate the use of locuscompare, provide two data frames with chromosome, position, and -log10 p-value:
 
 ```
 library(locuscomparer)
-gwas_fn = system.file('extdata','gwas.tsv', package = 'locuscomparer')
-eqtl_fn = system.file('extdata','eqtl.tsv', package = 'locuscomparer')
-locuscompare(in_fn1 = gwas_fn, in_fn2 = eqtl_fn, title1 = 'CAD GWAS', title2 = 'Coronary Artery eQTL')
+gwas_df = data.frame(chromosome = '1', position = 1:1000, check.names = FALSE)
+gwas_df[['-log10 p-value']] = runif(1000, 0, 12)
+eqtl_df = data.frame(chromosome = '1', position = 1:1000, check.names = FALSE)
+eqtl_df[['-log10 p-value']] = runif(1000, 0, 12)
+lead_ld = data.frame(chromosome = '1', position = 1:1000, r2 = runif(1000, 0, 1))
+locuscompare(in_fn1 = gwas_df, in_fn2 = eqtl_df, lead_ld = lead_ld,
+             title1 = 'CAD GWAS', title2 = 'Coronary Artery eQTL')
 ```
 
 The output from the `main` function is a figure like the following:
@@ -30,19 +34,20 @@ The labeled SNP is the lead SNP (in this case for both studies), and other SNPs 
 
 ## 3. Using your own dataset:
 
-The input to `locuscompare::main()` is a two-column tab-delimited text file with two columns: 
+The input to `locuscompare()` is two data frames with three required columns:
 
-1. rsid 
-2. pval 
+1. chromosome
+2. position
+3. -log10 p-value
 
-Here is an example file:
+Here is an example data frame:
 
 ```
-rsid	pval
-rs62156064	0.564395
-rs7562234	0.399642
-rs11677377	0.34308
-rs35076156	0.625237
+chromosome	position	-log10 p-value
+1	12345	3.21
+1	12500	1.87
+1	13000	5.42
+1	14000	0.90
 ```
 
 You can download the example files below:  [GWAS](https://raw.githubusercontent.com/boxiangliu/locuscomparer/master/inst/extdata/gwas.tsv) and [eQTL](https://raw.githubusercontent.com/boxiangliu/locuscomparer/master/inst/extdata/eqtl.tsv) datasets. 
@@ -50,9 +55,11 @@ You can download the example files below:  [GWAS](https://raw.githubusercontent.
 Then run the following commands: 
 ```
 library(locuscomparer)
-gwas_fn = 'path/to/gwas.tsv'
-eqtl_fn = 'path/to/eqtl.tsv'
-locuscompare(in_fn1 = gwas_fn, in_fn2 = eqtl_fn, title = 'GWAS', title2 = 'eQTL')
+gwas_df = read.table('path/to/gwas.tsv', header = TRUE, check.names = FALSE)
+eqtl_df = read.table('path/to/eqtl.tsv', header = TRUE, check.names = FALSE)
+lead_ld = read.table('path/to/lead_ld.tsv', header = TRUE)
+locuscompare(in_fn1 = gwas_df, in_fn2 = eqtl_df, lead_ld = lead_ld,
+             title1 = 'GWAS', title2 = 'eQTL')
 ```
 
 ## 4. Documentations
@@ -85,4 +92,3 @@ If you use locuscompare, please cite the following paper: https://www.nature.com
 
 
 Boxiang Liu, Michael J. Gloudemans, Abhiram S. Rao, Erik Ingelsson & Stephen B. Montgomery (2019) Abundant associations with gene expression complicate GWAS follow-up, *Nature Genetics*
-
